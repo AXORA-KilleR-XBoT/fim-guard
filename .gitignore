@@ -1,0 +1,7 @@
+__pycache__/
+.pytest_cache/
+.venv/
+baseline.json
+*.key
+# Throw-away folder created by the README walkthrough
+demo/

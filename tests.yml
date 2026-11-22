@@ -1,0 +1,45 @@
+name: Python CI
+
+on:
+  push:
+    branches: [main]      # change this if your default branch has another name
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.10", "3.11", "3.12", "3.13"]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+          cache-dependency-path: requirements-dev.txt
+      - run: python -m pip install -r requirements-dev.txt
+      - run: python -m pytest -q
+      - name: Run the real command line once (init, change a file, check)
+        run: |
+          mkdir -p "$RUNNER_TEMP/site" "$RUNNER_TEMP/state"
+          echo "debug=false" > "$RUNNER_TEMP/site/config.ini"
+          python fim_guard.py init "$RUNNER_TEMP/site" --baseline "$RUNNER_TEMP/state/baseline.json"
+          python fim_guard.py check "$RUNNER_TEMP/site" --baseline "$RUNNER_TEMP/state/baseline.json"
+          echo "debug=true" > "$RUNNER_TEMP/site/config.ini"
+          status=0
+          python fim_guard.py check "$RUNNER_TEMP/site" --baseline "$RUNNER_TEMP/state/baseline.json" || status=$?
+          echo "exit code after the change: $status (1 is expected)"
+          test "$status" -eq 1
